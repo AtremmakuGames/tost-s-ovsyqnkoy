@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тост с овсянкой</title>
+<style>
+  :root {
+    --bg: #fff6e8;
+    --card: #ffffff;
+    --ink: #3b2a1a;
+    --muted: #8a7560;
+    --accent: #e0892b;
+    --accent-dark: #b8661a;
+    --good: #3f9d4a;
+    --bad: #cc3b2f;
+    --line: #ecd9bf;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+  }
+  .game { width: 100%; max-width: 560px; }
+  h1 { text-align: center; margin: 8px 0 4px; font-size: 28px; }
+  .subtitle { text-align: center; color: var(--muted); margin: 0 0 16px; }
+
+  .steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .step-dot {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--line); color: var(--muted); font-weight: 700; font-size: 14px;
+  }
+  .step-dot.active { background: var(--accent); color: #fff; }
+  .step-dot.done { background: var(--good); color: #fff; }
+
+  .card {
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(120, 80, 30, .08);
+  }
+  .card h2 { margin: 0 0 6px; font-size: 22px; }
+  .card p { margin: 0 0 14px; color: var(--muted); }
+
+  .scene { height: 190px; display: grid; place-items: center; margin: 8px 0 16px; position: relative; }
+
+  button {
+    font: inherit; font-weight: 700; font-size: 17px;
+    border: none; border-radius: 12px;
+    padding: 12px 22px; cursor: pointer;
+    background: var(--accent); color: #fff;
+    box-shadow: 0 4px 0 var(--accent-dark);
+    transition: transform .08s, box-shadow .08s;
+    touch-action: manipulation;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent-dark); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.secondary { background: #fff; color: var(--ink); border: 2px solid var(--line); box-shadow: 0 4px 0 var(--line); }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+  .msg { min-height: 24px; margin-top: 12px; font-weight: 600; }
+  .msg.good { color: var(--good); }
+  .msg.bad { color: var(--bad); }
+
+  /* --- Toast drawing --- */
+  .toast {
+    width: 140px; height: 130px;
+    background: #f3dcae;
+    border: 8px solid #c98b45;
+    border-radius: 48px 48px 14px 14px;
+    position: relative;
+    transition: background-color .3s, border-color .3s;
+  }
+  .toast .oat-layer {
+    position: absolute; left: 8px; right: 8px; top: 22px; bottom: 10px;
+    border-radius: 30px 30px 8px 8px;
+    background: radial-gradient(circle at 30% 30%, #f6ecd7, #e7d3ab);
+    opacity: 0; transition: opacity .4s;
+  }
+  .toast .oat-layer::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background-image:
+      radial-gradient(ellipse 6px 3px at 20% 30%, #d8bd8a 60%, transparent 62%),
+      radial-gradient(ellipse 6px 3px at 60% 25%, #d8bd8a 60%, transparent 62%),
+      radial-gradient(ellipse 6px 3px at 40% 60%, #d8bd8a 60%, transparent 62%),
+      radial-gradient(ellipse 6px 3px at 75% 65%, #d8bd8a 60%, transparent 62%),
+      radial-gradient(ellipse 6px 3px at 25% 80%, #d8bd8a 60%, transparent 62%);
+  }
+  .toppings { position: absolute; inset: 0; pointer-events: none; }
+  .toppings span { position: absolute; font-size: 22px; }
+
+  /* --- Toaster --- */
+  .toaster {
+    width: 190px; height: 110px; background: linear-gradient(#d7dde2, #aab3ba);
+    border-radius: 26px 26px 14px 14px; position: absolute; bottom: 0;
+    box-shadow: inset 0 -8px 0 rgba(0,0,0,.08);
+  }
+  .toaster::before {
+    content: ""; position: absolute; top: 10px; left: 30px; right: 30px; height: 10px;
+    background: #444; border-radius: 6px;
+  }
+  .toaster .lever {
+    position: absolute; right: -14px; width: 18px; height: 12px; background: #333; border-radius: 4px;
+    top: 24px; transition: top .3s;
+  }
+  .toaster.on .lever { top: 70px; }
+  .toaster .glow { position: absolute; left: 20px; bottom: 16px; width: 12px; height: 12px; border-radius: 50%; background: #666; }
+  .toaster.on .glow { background: #ff5a2a; box-shadow: 0 0 10px #ff5a2a; }
+  .in-toaster {
+    position: absolute; bottom: 40px; transform: scale(.75); transition: bottom .4s;
+  }
+  .in-toaster.down { bottom: 10px; }
+  .in-toaster.up { bottom: 90px; }
+
+  .meter {
+    height: 26px; border-radius: 13px; overflow: hidden; position: relative;
+    background: linear-gradient(90deg, #f3dcae 0%, #e0b36c 40%, #b97a33 55%, #b97a33 70%, #5b3413 85%, #1e1208 100%);
+    border: 2px solid var(--line); margin: 0 0 14px;
+  }
+  .meter .zone {
+    position: absolute; top: 0; bottom: 0; left: 50%; width: 22%;
+    border-left: 3px dashed #fff; border-right: 3px dashed #fff;
+  }
+  .meter .needle {
+    position: absolute; top: -4px; bottom: -4px; width: 5px; background: var(--ink); border-radius: 3px; left: 0;
+  }
+
+  /* --- Pot --- */
+  .pot {
+    width: 180px; height: 110px; position: absolute; bottom: 10px;
+    background: linear-gradient(#5d6a75, #3b454e); border-radius: 10px 10px 50px 50px;
+  }
+  .pot::before, .pot::after {
+    content: ""; position: absolute; top: 18px; width: 26px; height: 12px; background: #3b454e; border-radius: 6px;
+  }
+  .pot::before { left: -20px; } .pot::after { right: -20px; }
+  .pot .fill {
+    position: absolute; left: 10px; right: 10px; top: 8px; height: 22px; border-radius: 50%;
+    background: #fff; opacity: 0; transition: all .4s;
+  }
+  .steam { position: absolute; top: -10px; left: 0; right: 0; font-size: 28px; opacity: 0; transition: opacity .4s; }
+  .steam.on { opacity: 1; animation: rise 1.4s infinite; }
+  @keyframes rise { 0% { transform: translateY(8px); opacity: .2 } 50% { opacity: 1 } 100% { transform: translateY(-16px); opacity: 0 } }
+  .spoon { position: absolute; top: -40px; left: 80px; font-size: 44px; transform-origin: bottom center; }
+  .spoon.stir { animation: stir .35s ease-in-out; }
+  @keyframes stir { 0% { transform: rotate(-25deg) } 50% { transform: rotate(25deg) } 100% { transform: rotate(-25deg) } }
+
+  .progress { height: 14px; background: var(--line); border-radius: 7px; overflow: hidden; margin: 0 0 14px; }
+  .progress > div { height: 100%; width: 0; background: var(--good); transition: width .15s; }
+
+  .topping-btns button { font-size: 26px; padding: 8px 14px; }
+  .topping-btns button.picked { background: var(--good); box-shadow: 0 4px 0 #2c7535; }
+
+  .bite { animation: bite .3s; }
+  @keyframes bite { 50% { transform: scale(.9) rotate(-4deg) } }
+
+  /* --- Video modal --- */
+  .modal {
+    position: fixed; inset: 0; background: rgba(20, 12, 5, .85);
+    display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  .modal.open { display: flex; }
+  .modal-inner { width: 100%; max-width: 860px; text-align: center; }
+  .video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 14px; overflow: hidden; }
+  .video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .modal .row { margin-top: 14px; }
+  .modal a { color: #ffd59a; }
+</style>
+</head>
+<body>
+<div class="game">
+  <h1>🍞 Тост с овсянкой 🥣</h1>
+  <p class="subtitle">Приготовь идеальный завтрак!</p>
+  <div class="steps" id="steps"></div>
+  <div class="card" id="screen"></div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-inner">
+    <div class="video-wrap" id="videoWrap"></div>
+    <div class="row">
+      <button id="againBtn">Приготовить ещё 🍞</button>
+    </div>
+    <p><a href="https://youtube.com/watch?v=c0IqrnLVkRA" target="_blank" rel="noopener">Открыть видео на YouTube</a></p>
+  </div>
+</div>
+
+<script>
+const VIDEO_ID = "c0IqrnLVkRA";
+const TOTAL_STEPS = 5;
+
+const screen = document.getElementById("screen");
+const stepsEl = document.getElementById("steps");
+const modal = document.getElementById("modal");
+const videoWrap = document.getElementById("videoWrap");
+
+const state = { toastColor: null, toppings: [] };
+let timer = null;
+
+function stopTimer() { if (timer) { cancelAnimationFrame(timer); clearInterval(timer); timer = null; } }
+
+function renderSteps(current) {
+  stepsEl.innerHTML = "";
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
+    const d = document.createElement("div");
+    d.className = "step-dot" + (i < current ? " done" : i === current ? " active" : "");
+    d.textContent = i < current ? "✓" : i;
+    stepsEl.appendChild(d);
+  }
+}
+
+function toastHTML({ oats = false, toppings = [], id = "" } = {}) {
+  const color = state.toastColor || { bg: "#f3dcae", border: "#c98b45" };
+  const spots = [[18, 30], [62, 28], [38, 58], [70, 62], [22, 72], [50, 40]];
+  const tops = toppings.map((t, i) => {
+    const [x, y] = spots[i % spots.length];
+    return `<span style="left:${x}%;top:${y}%">${t}</span>`;
+  }).join("");
+  return `<div class="toast" ${id ? `id="${id}"` : ""} style="background:${color.bg};border-color:${color.border}">
+    <div class="oat-layer" style="opacity:${oats ? 1 : 0}"></div>
+    <div class="toppings">${tops}</div>
+  </div>`;
+}
+
+/* ---------- Step 0: Start ---------- */
+function startScreen() {
+  stopTimer();
+  state.toastColor = null;
+  state.toppings = [];
+  renderSteps(0);
+  screen.innerHTML = `
+    <h2>Доброе утро! ☀️</h2>
+    <p>Поджарь хлеб, свари овсянку, намажь её на тост, укрась — и съешь!</p>
+    <div class="scene">${toastHTML()}</div>
+    <button id="go">Начать готовить</button>`;
+  document.getElementById("go").onclick = toastStep;
+}
+
+/* ---------- Step 1: Toast bread ---------- */
+function toastStep() {
+  renderSteps(1);
+  screen.innerHTML = `
+    <h2>Шаг 1: Поджарь хлеб</h2>
+    <p>Нажми «Стоп», когда стрелка будет в золотистой зоне!</p>
+    <div class="scene">
+      <div class="in-toaster" id="bread">${toastHTML()}</div>
+      <div class="toaster" id="toaster"><div class="lever"></div><div class="glow"></div></div>
+    </div>
+    <div class="meter"><div class="zone"></div><div class="needle" id="needle"></div></div>
+    <div class="row"><button id="start">Опустить хлеб</button></div>
+    <div class="msg" id="msg"></div>`;
+
+  const startBtn = document.getElementById("start");
+  const needle = document.getElementById("needle");
+  const toaster = document.getElementById("toaster");
+  const bread = document.getElementById("bread");
+  const breadToast = bread.querySelector(".toast");
+  const msg = document.getElementById("msg");
+  let running = false, pos = 0, t0 = 0;
+
+  const colorAt = p => {
+    // 0..1 -> bread color
+    const stops = [[0, [243, 220, 174]], [0.4, [224, 179, 108]], [0.6, [185, 122, 51]], [0.85, [91, 52, 19]], [1, [30, 18, 8]]];
+    for (let i = 1; i < stops.length; i++) {
+      if (p <= stops[i][0]) {
+        const [a, ca] = stops[i - 1], [b, cb] = stops[i];
+        const k = (p - a) / (b - a);
+        return ca.map((v, j) => Math.round(v + (cb[j] - v) * k));
+      }
+    }
+    return stops[stops.length - 1][1];
+  };
+
+  startBtn.onclick = () => {
+    if (!running) {
+      running = true; pos = 0; t0 = performance.now();
+      msg.textContent = ""; msg.className = "msg";
+      toaster.classList.add("on"); bread.className = "in-toaster down";
+      startBtn.textContent = "Стоп!";
+      const tick = now => {
+        pos = Math.min(1, (now - t0) / 4000);
+        needle.style.left = `calc(${pos * 100}% - 2px)`;
+        const [r, g, b] = colorAt(pos);
+        breadToast.style.background = `rgb(${r},${g},${b})`;
+        if (pos >= 1) { finish(); return; }
+        timer = requestAnimationFrame(tick);
+      };
+      timer = requestAnimationFrame(tick);
+    } else {
+      finish();
+    }
+  };
+
+  function finish() {
+    stopTimer(); running = false;
+    toaster.classList.remove("on"); bread.className = "in-toaster up";
+    const [r, g, b] = colorAt(pos);
+    if (pos >= 0.5 && pos <= 0.72) {
+      state.toastColor = { bg: `rgb(${r},${g},${b})`, border: `rgb(${r * .7 | 0},${g * .6 | 0},${b * .5 | 0})` };
+      msg.textContent = "Идеально! Золотистая корочка! 🎉"; msg.className = "msg good";
+      startBtn.textContent = "Дальше →";
+      startBtn.onclick = oatsStep;
+    } else {
+      msg.textContent = pos < 0.5 ? "Слишком бледный... Попробуй ещё раз!" : "Сгорел! 🔥 Попробуй ещё раз!";
+      msg.className = "msg bad";
+      startBtn.textContent = "Попробовать снова";
+      startBtn.onclick = toastStep;
+    }
+  }
+}
+
+/* ---------- Step 2: Cook oatmeal ---------- */
+function oatsStep() {
+  renderSteps(2);
+  screen.innerHTML = `
+    <h2>Шаг 2: Свари овсянку</h2>
+    <p>Добавь ингредиенты по порядку</p>
+    <div class="scene">
+      <div class="pot" id="pot">
+        <div class="steam" id="steam">♨️ ♨️ ♨️</div>
+        <div class="fill" id="fill"></div>
+      </div>
+    </div>
+    <div class="row" id="ingr">
+      <button data-i="0">🥛 Молоко</button>
+      <button data-i="1" disabled>🌾 Овсяные хлопья</button>
+      <button data-i="2" disabled>🍯 Щепотка сахара</button>
+    </div>
+    <div class="msg" id="msg"></div>`;
+
+  const fill = document.getElementById("fill");
+  const msg = document.getElementById("msg");
+  const btns = [...document.querySelectorAll("#ingr button")];
+  const looks = [
+    { background: "#ffffff", top: "30px", opacity: 1 },
+    { background: "#ecdcbc", top: "18px", opacity: 1 },
+    { background: "#e7d0a2", top: "14px", opacity: 1 },
+  ];
+  btns.forEach((b, i) => b.onclick = () => {
+    Object.assign(fill.style, looks[i]);
+    b.disabled = true;
+    if (btns[i + 1]) btns[i + 1].disabled = false;
+    msg.textContent = ["Молоко налито!", "Хлопья засыпаны!", "Сладенько! Теперь помешай."][i];
+    msg.className = "msg good";
+    if (i === 2) setTimeout(stirStep, 700);
+  });
+}
+
+/* ---------- Step 3: Stir ---------- */
+function stirStep() {
+  renderSteps(3);
+  screen.innerHTML = `
+    <h2>Шаг 3: Помешивай!</h2>
+    <p>Быстро жми «Мешать», пока овсянка не сварится</p>
+    <div class="scene">
+      <div class="pot">
+        <div class="spoon" id="spoon">🥄</div>
+        <div class="steam on">♨️ ♨️ ♨️</div>
+        <div class="fill" style="opacity:1;background:#e7d0a2;top:14px"></div>
+      </div>
+    </div>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="row"><button id="stir">Мешать 🥄</button></div>
+    <div class="msg" id="msg"></div>`;
+
+  const bar = document.getElementById("bar");
+  const spoon = document.getElementById("spoon");
+  const btn = document.getElementById("stir");
+  const msg = document.getElementById("msg");
+  let progress = 0;
+
+  // Porridge slowly "cools" if you stop stirring
+  timer = setInterval(() => {
+    progress = Math.max(0, progress - 1.2);
+    bar.style.width = progress + "%";
+  }, 200);
+
+  btn.onclick = () => {
+    progress = Math.min(100, progress + 7);
+    bar.style.width = progress + "%";
+    spoon.classList.remove("stir"); void spoon.offsetWidth; spoon.classList.add("stir");
+    if (progress >= 100) {
+      stopTimer();
+      msg.textContent = "Овсянка готова! 😋"; msg.className = "msg good";
+      btn.textContent = "Дальше →";
+      btn.onclick = spreadStep;
+    }
+  };
+}
+
+/* ---------- Step 4: Spread + toppings ---------- */
+function spreadStep() {
+  renderSteps(4);
+  const toppingList = ["🍓", "🍌", "🫐", "🍯", "🥜", "🍫"];
+  screen.innerHTML = `
+    <h2>Шаг 4: Собери тост</h2>
+    <p>Намажь овсянку и добавь начинку (до 6 штук)</p>
+    <div class="scene" id="scene">${toastHTML()}</div>
+    <div class="row"><button id="spread">Намазать овсянку 🥣</button></div>
+    <div class="row topping-btns" id="tops" style="margin-top:12px">
+      ${toppingList.map(t => `<button disabled data-t="${t}">${t}</button>`).join("")}
+    </div>
+    <div class="row" style="margin-top:14px"><button id="done" disabled>Готово! →</button></div>
+    <div class="msg" id="msg"></div>`;
+
+  const scene = document.getElementById("scene");
+  const topBtns = [...document.querySelectorAll("#tops button")];
+  const done = document.getElementById("done");
+  const msg = document.getElementById("msg");
+  const redraw = () => scene.innerHTML = toastHTML({ oats: true, toppings: state.toppings });
+
+  document.getElementById("spread").onclick = e => {
+    e.currentTarget.disabled = true;
+    redraw();
+    topBtns.forEach(b => b.disabled = false);
+    done.disabled = false;
+    msg.textContent = "Намазано! Теперь украшения."; msg.className = "msg good";
+  };
+  topBtns.forEach(b => b.onclick = () => {
+    if (state.toppings.length >= 6) { msg.textContent = "Хватит, тост не резиновый! 😄"; msg.className = "msg bad"; return; }
+    state.toppings.push(b.dataset.t);
+    b.classList.add("picked");
+    redraw();
+  });
+  done.onclick = eatStep;
+}
+
+/* ---------- Step 5: Eat ---------- */
+function eatStep() {
+  renderSteps(5);
+  screen.innerHTML = `
+    <h2>Тост с овсянкой готов! 🎉</h2>
+    <p>Выглядит очень аппетитно...</p>
+    <div class="scene">${toastHTML({ oats: true, toppings: state.toppings, id: "final" })}</div>
+    <button id="eat">Съесть тост 😋</button>`;
+  document.getElementById("eat").onclick = () => {
+    document.getElementById("final").classList.add("bite");
+    setTimeout(openVideo, 300);
+  };
+}
+
+function openVideo() {
+  videoWrap.innerHTML = `<iframe
+    src="https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&rel=0"
+    title="YouTube video"
+    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+    allowfullscreen></iframe>`;
+  modal.classList.add("open");
+}
+
+document.getElementById("againBtn").onclick = () => {
+  modal.classList.remove("open");
+  videoWrap.innerHTML = ""; // stop playback
+  startScreen();
+};
+
+startScreen();
+</script>
+</body>
+</html>
